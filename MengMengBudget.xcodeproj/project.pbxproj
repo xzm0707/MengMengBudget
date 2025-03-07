@@ -11,7 +11,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		60CC98D52D798976009B6C16 /* MengMengBudget */ = {
+		60CC98F52D79899D009B6C16 /* MengMengBudget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = MengMengBudget;
 			sourceTree = "<group>";
@@ -32,8 +32,8 @@
 		60CC98CA2D798976009B6C16 = {
 			isa = PBXGroup;
 			children = (
-				60CC98D52D798976009B6C16 /* MengMengBudget */,
 				60CC98D42D798976009B6C16 /* Products */,
+				60CC98F52D79899D009B6C16 /* MengMengBudget */,
 			);
 			sourceTree = "<group>";
 		};
@@ -61,7 +61,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				60CC98D52D798976009B6C16 /* MengMengBudget */,
+				60CC98F52D79899D009B6C16 /* MengMengBudget */,
 			);
 			name = MengMengBudget;
 			packageProductDependencies = (

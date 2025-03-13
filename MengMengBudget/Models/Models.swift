@@ -4,13 +4,11 @@ import SwiftUI
 enum TransactionType: String, Codable, CaseIterable {
     case expense = "expense"
     case income = "income"
-    case transfer = "transfer"
     
     var title: String {
         switch self {
         case .expense: return "支出"
         case .income: return "收入"
-        case .transfer: return "转账"
         }
     }
 }

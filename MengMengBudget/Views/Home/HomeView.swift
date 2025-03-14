@@ -1,12 +1,16 @@
-             import SwiftUI
+import SwiftUI
 
 struct HomeView: View {
-    @Binding var showAddTransaction: Bool
-    
-    @State private var monthlyBalance: Double = 3254.65
-    @State private var monthlyIncome: Double = 8750.00
-    @State private var monthlyExpense: Double = 5495.35
+   @Binding var showAddTransaction: Bool
+    // 修改这些状态变量的初始值为0，稍后会从API获取
+    @State private var monthlyBalance: Double = 0.0
+    @State private var monthlyIncome: Double = 0.0
+    @State private var monthlyExpense: Double = 0.0
     @State private var recentTransactions = SampleData.transactions
+    // 添加加载状态
+    @State private var isLoading = false
+    @State private var hasError = false
+
     
     var body: some View {
         NavigationView {
@@ -72,8 +76,94 @@ struct HomeView: View {
                         }
                     }
                 }
+            } // 添加刷新控件
+            .refreshable {
+                await loadData()
             }
         }
+         // 添加onAppear生命周期方法，在视图出现时加载数据
+        .onAppear {
+            loadData()
+        }// 可选：添加错误提示
+        .overlay(
+            Group {
+                if isLoading {
+                    ProgressView("加载中...")
+                        .padding()
+                        .background(Color.white.opacity(0.8))
+                        .cornerRadius(10)
+                } else if hasError {
+                    VStack {
+                        Text("数据加载失败")
+                            .foregroundColor(.red)
+                        Button("重试") {
+                            loadData()
+                        }
+                        .padding(8)
+                        .background(AppColors.pinkLight)
+                        .foregroundColor(AppColors.pinkPrimary)
+                        .cornerRadius(8)
+                    }
+                    .padding()
+                    .background(Color.white)
+                    .cornerRadius(10)
+                    .shadow(radius: 5)
+                }
+            }
+            .opacity(isLoading || hasError ? 1 : 0)
+        )
+    }
+    // 添加加载数据的方法
+    private func loadData() {
+        // 如果已经在加载中，则不重复加载
+        if isLoading { return }
+        
+        isLoading = true
+        hasError = false
+        
+        // 先登录获取token
+        NetworkService.shared.login { success in
+            if success {
+                // 登录成功后获取首页数据
+                NetworkService.shared.getHomeSummary(
+                    completion: { income, balance, expense in
+                        // 在主线程更新UI
+                        DispatchQueue.main.async {
+                            self.monthlyIncome = income
+                            self.monthlyBalance = balance
+                            self.monthlyExpense = expense
+                            self.isLoading = false
+                        }
+                    },
+                    failure: {
+                        // 处理获取数据失败的情况
+                        DispatchQueue.main.async {
+                            self.isLoading = false
+                            self.hasError = true
+                        }
+                    }
+                )
+            } else {
+                // 处理登录失败的情况
+                DispatchQueue.main.async {
+                    self.isLoading = false
+                    self.hasError = true
+                }
+            }
+        }
+    }
+}
+
+// 为了支持async/await的refreshable
+extension HomeView {
+    private func loadData() async {
+        // 创建一个任务来执行同步版本的loadData方法
+        Task {
+            loadData()
+        }
+        // 等待2秒，确保异步操作有足够时间完成
+        // 这是一个简化处理，实际应用中可能需要更复杂的异步处理
+        try? await Task.sleep(nanoseconds: 2_000_000_000)
     }
 }
 

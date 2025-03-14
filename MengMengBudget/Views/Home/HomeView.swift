@@ -1,23 +1,23 @@
 import SwiftUI
 
 struct HomeView: View {
-   @Binding var showAddTransaction: Bool
-    // 修改这些状态变量的初始值为0，稍后会从API获取
+    @Binding var showAddTransaction: Bool
     @State private var monthlyBalance: Double = 0.0
     @State private var monthlyIncome: Double = 0.0
     @State private var monthlyExpense: Double = 0.0
     @State private var recentTransactions = SampleData.transactions
-    // 添加加载状态
     @State private var isLoading = false
     @State private var hasError = false
-
     
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
+                    // 添加一个空白视图，为导航栏留出空间
+                    Color.clear.frame(height: 15)
+
                     // 余额卡片
-                    BalanceCardView(
+                    BalanceCard(
                         balance: monthlyBalance,
                         income: monthlyIncome,
                         expense: monthlyExpense
@@ -29,7 +29,9 @@ struct HomeView: View {
                     })
                     
                     // 最近交易
-                    RecentTransactionsView(transactions: recentTransactions)
+                    RecentTransactionsCard(
+                        transactions: recentTransactions
+                    )
                     
                     // 小贴士
                     TipCardView(
@@ -37,10 +39,14 @@ struct HomeView: View {
                         title: "小贴士",
                         message: "本月餐饮支出已超过预算的80%，建议控制一下哦～"
                     )
+                     // 添加一些额外的空间，确保内容可以滚动到底部
+                    Spacer().frame(height: 100)
                 }
                 .padding(.horizontal)
-                .padding(.bottom, 100)
             }
+            // 确保滚动视图可以滚动,并显示滚动条
+            .scrollDismissesKeyboard(.immediately)
+            .scrollIndicators(.visible)
             .background(AppColors.background.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -59,116 +65,96 @@ struct HomeView: View {
                             .foregroundColor(AppColors.pinkPrimary)
                             .cornerRadius(10)
                     }
+
                 }
                 
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack {
-                        Button {
-                            // 通知操作
-                        } label: {
-                            CircleIconButton(icon: "bell.fill", color: AppColors.pinkPrimary)
-                        }
+                // ToolbarItem(placement: .navigationBarTrailing) {
+                //     HStack {
                         
-                        Button {
-                            // 设置操作
-                        } label: {
-                            CircleIconButton(icon: "gearshape.fill", color: AppColors.pinkPrimary)
-                        }
-                    }
-                }
-            } // 添加刷新控件
-            .refreshable {
-                await loadData()
+                //         Button {
+                //             // 设置操作
+                //         } label: {
+                //             CircleIconButton(icon: "gearshape.fill", color: AppColors.pinkPrimary)
+                //         }
+                //     }
+                // }
             }
-        }
-         // 添加onAppear生命周期方法，在视图出现时加载数据
-        .onAppear {
-            loadData()
-        }// 可选：添加错误提示
-        .overlay(
-            Group {
+            .refreshable {
+                await refreshData()
+            }
+            .overlay {
                 if isLoading {
-                    ProgressView("加载中...")
-                        .padding()
-                        .background(Color.white.opacity(0.8))
-                        .cornerRadius(10)
-                } else if hasError {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .progressViewStyle(CircularProgressViewStyle(tint: AppColors.pinkPrimary))
+                }
+                
+                if hasError {
                     VStack {
-                        Text("数据加载失败")
-                            .foregroundColor(.red)
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.system(size: 50))
+                            .foregroundColor(AppColors.pinkPrimary)
+                        
+                        Text("加载失败，请下拉刷新")
+                            .font(.headline)
+                            .foregroundColor(AppColors.textSecondary)
+                            .padding(.top)
+                        
                         Button("重试") {
                             loadData()
                         }
-                        .padding(8)
-                        .background(AppColors.pinkLight)
+                        .padding(.top, 8)
                         .foregroundColor(AppColors.pinkPrimary)
-                        .cornerRadius(8)
                     }
-                    .padding()
-                    .background(Color.white)
-                    .cornerRadius(10)
-                    .shadow(radius: 5)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.white.opacity(0.9))
                 }
             }
-            .opacity(isLoading || hasError ? 1 : 0)
-        )
+            .onAppear {
+                print("HomeView出现，开始加载数据")
+                loadData()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RefreshHomeData"))) { _ in
+                loadData()
+            }
+        }
+        // 添加这一行，明确指定导航视图样式
+        .navigationViewStyle(StackNavigationViewStyle())
     }
-    // 添加加载数据的方法
+    
     private func loadData() {
-        // 如果已经在加载中，则不重复加载
-        if isLoading { return }
-        
         isLoading = true
         hasError = false
         
-        // 先登录获取token
-        NetworkService.shared.login { success in
-            if success {
-                // 登录成功后获取首页数据
-                NetworkService.shared.getHomeSummary(
-                    completion: { income, balance, expense in
-                        // 在主线程更新UI
-                        DispatchQueue.main.async {
-                            self.monthlyIncome = income
-                            self.monthlyBalance = balance
-                            self.monthlyExpense = expense
-                            self.isLoading = false
-                        }
-                    },
-                    failure: {
-                        // 处理获取数据失败的情况
-                        DispatchQueue.main.async {
-                            self.isLoading = false
-                            self.hasError = true
-                        }
-                    }
-                )
-            } else {
-                // 处理登录失败的情况
+        NetworkService.shared.getHomeSummary(
+            completion: { income, balance, expense in
+                DispatchQueue.main.async {
+                    print("成功获取首页数据并更新UI: income=\(income), balance=\(balance), expense=\(expense)")
+                    self.monthlyIncome = income
+                    self.monthlyBalance = balance
+                    self.monthlyExpense = expense
+                    self.isLoading = false
+                }
+            },
+            failure: {
                 DispatchQueue.main.async {
                     self.isLoading = false
                     self.hasError = true
                 }
             }
-        }
+        )
     }
-}
-
-// 为了支持async/await的refreshable
-extension HomeView {
-    private func loadData() async {
-        // 创建一个任务来执行同步版本的loadData方法
-        Task {
-            loadData()
+    
+    private func refreshData() async {
+        DispatchQueue.main.async {
+            self.loadData()
         }
-        // 等待2秒，确保异步操作有足够时间完成
-        // 这是一个简化处理，实际应用中可能需要更复杂的异步处理
-        try? await Task.sleep(nanoseconds: 2_000_000_000)
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
     }
 }
 
 // 余额卡片
-struct BalanceCardView: View {
+struct BalanceCard: View {
     let balance: Double
     let income: Double
     let expense: Double
@@ -327,7 +313,7 @@ struct QuickActionsView: View {
 }
 
 // 最近交易视图
-struct RecentTransactionsView: View {
+struct RecentTransactionsCard: View {
     let transactions: [Transaction]
     
     var body: some View {

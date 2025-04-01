@@ -7,30 +7,32 @@ struct ProfileView: View {
     @State private var alertMessage = ""
     @State private var avatarImage: Image = Image(systemName: "person.circle.fill")
     @State private var username: String = "用户"
+    @State private var showFamilyCodeModal = false
     
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 20) {
-                    // 头像和用户名
-                    VStack(spacing: 15) {
+                VStack(spacing: 25) {
+                    // 头像和用户名卡片
+                    VStack(spacing: 10) {
                         avatarImage
                             .resizable()
                             .scaledToFit()
                             .frame(width: 80, height: 80)
-                            .foregroundColor(AppColors.pinkPrimary)
-                            .background(Circle().fill(AppColors.pinkLight))
+                            .foregroundColor(.white)
+                            .background(Circle().fill(AppColors.pinkPrimary))
                             .padding(5)
-                            .background(Circle().stroke(AppColors.pinkPrimary, lineWidth: 2))
                         
                         Text(username)
                             .font(.title3)
                             .fontWeight(.medium)
                             .foregroundColor(AppColors.textPrimary)
                     }
+                    .frame(maxWidth: .infinity)
                     .padding(.vertical, 20)
+                    .background(AppColors.background)
                     
-                    // 设置项
+                    // 设置项卡片
                     VStack(spacing: 0) {
                         // 账户管理
                         SettingItemView(
@@ -40,7 +42,7 @@ struct ProfileView: View {
                             action: {}
                         )
                         
-                        Divider().padding(.leading, 50)
+                        Divider().padding(.leading, 60)
                         
                         // 生成家庭码
                         SettingItemView(
@@ -52,41 +54,10 @@ struct ProfileView: View {
                             }
                         )
                     }
-                    .background(AppColors.card)
+                    .background(Color.white)
                     .cornerRadius(16)
-                    .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+                    .shadow(color: Color.black.opacity(0.03), radius: 10, x: 0, y: 5)
                     .padding(.horizontal)
-                    
-                    // 家庭码显示区域
-                    if !familyCode.isEmpty {
-                        VStack(spacing: 10) {
-                            Text("您的家庭码")
-                                .font(.headline)
-                                .foregroundColor(AppColors.textPrimary)
-                            
-                            Text(familyCode)
-                                .font(.system(.body, design: .monospaced))
-                                .padding()
-                                .background(AppColors.pinkLight)
-                                .cornerRadius(8)
-                                .foregroundColor(AppColors.pinkPrimary)
-                            
-                            Button {
-                                UIPasteboard.general.string = familyCode
-                                alertMessage = "家庭码已复制到剪贴板"
-                                showAlert = true
-                            } label: {
-                                Label("复制家庭码", systemImage: "doc.on.doc")
-                                    .foregroundColor(AppColors.pinkPrimary)
-                            }
-                            .padding(.top, 5)
-                        }
-                        .padding()
-                        .background(AppColors.card)
-                        .cornerRadius(16)
-                        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
-                        .padding(.horizontal)
-                    }
                     
                     // 退出登录按钮
                     Button {
@@ -94,12 +65,13 @@ struct ProfileView: View {
                     } label: {
                         HStack {
                             Image(systemName: "arrow.right.square")
+                                .font(.system(size: 18))
                             Text("退出登录")
+                                .font(.system(size: 18))
                         }
-                        .font(.headline)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
-                        .padding()
+                        .padding(.vertical, 15)
                         .background(
                             LinearGradient(
                                 gradient: Gradient(colors: [AppColors.pinkStart, AppColors.pinkEnd]),
@@ -110,17 +82,17 @@ struct ProfileView: View {
                         .cornerRadius(12)
                     }
                     .padding(.horizontal)
-                    .padding(.top, 20)
+                    .padding(.top, 10)
                 }
                 .padding(.bottom, 100) // 为底部TabBar留出空间
             }
             .background(AppColors.background.ignoresSafeArea())
+            // 移除顶部标题
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text("个人设置")
-                        .font(.headline)
-                        .foregroundColor(AppColors.textPrimary)
+                    // 空的ToolbarItem，移除"个人设置"标题
+                    EmptyView()
                 }
             }
             .alert(isPresented: $showAlert) {
@@ -136,6 +108,29 @@ struct ProfileView: View {
                     }
                 }
             )
+            // 添加家庭码显示弹窗
+            .sheet(isPresented: $showFamilyCodeModal) {
+                FamilyCodeView(familyCode: familyCode)
+            }
+        }
+        .onAppear {
+            loadUserInfo()
+        }
+        // 添加这一行，明确指定导航视图样式
+        .navigationViewStyle(StackNavigationViewStyle())
+    }
+    
+    // 添加加载用户信息的方法
+    private func loadUserInfo() {
+        if let token = NetworkService.shared.getToken() {
+            // 从token中解析用户名（假设token是JWT格式）
+            let tokenParts = token.split(separator: ".")
+            if tokenParts.count > 1,
+               let payload = Data(base64Encoded: String(tokenParts[1])),
+               let json = try? JSONSerialization.jsonObject(with: payload, options: []) as? [String: Any],
+               let sub = json["sub"] as? String {
+                username = sub
+            }
         }
     }
     
@@ -184,6 +179,8 @@ struct ProfileView: View {
                         if code == 200,
                            let dataObj = json["data"] as? String {
                             familyCode = dataObj
+                            // 显示家庭码弹窗
+                            showFamilyCodeModal = true
                         } else {
                             let message = json["message"] as? String ?? "生成家庭码失败"
                             alertMessage = message
@@ -208,6 +205,7 @@ struct ProfileView: View {
     }
 }
 
+// 修改设置项视图样式
 struct SettingItemView: View {
     let icon: String
     let iconColor: Color
@@ -219,25 +217,88 @@ struct SettingItemView: View {
             HStack(spacing: 15) {
                 ZStack {
                     Circle()
-                        .fill(iconColor.opacity(0.1))
-                        .frame(width: 36, height: 36)
+                        .fill(iconColor.opacity(0.15))
+                        .frame(width: 40, height: 40)
                     
                     Image(systemName: icon)
-                        .font(.system(size: 16))
+                        .font(.system(size: 18))
                         .foregroundColor(iconColor)
                 }
                 
                 Text(title)
-                    .font(.body)
+                    .font(.system(size: 16))
                     .foregroundColor(AppColors.textPrimary)
                 
                 Spacer()
                 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14))
-                    .foregroundColor(AppColors.textSecondary)
+                    .foregroundColor(Color.gray.opacity(0.5))
+            }
+            .padding(.vertical, 15)
+            .padding(.horizontal, 20)
+        }
+    }
+}
+
+// 家庭码视图保持不变
+struct FamilyCodeView: View {
+    @Environment(\.presentationMode) var presentationMode
+    let familyCode: String
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                Text("您的家庭码")
+                    .font(.headline)
+                    .foregroundColor(AppColors.textPrimary)
+                
+                Text(familyCode)
+                    .font(.system(.title2, design: .monospaced))
+                    .padding()
+                    .background(AppColors.pinkLight)
+                    .cornerRadius(8)
+                    .foregroundColor(AppColors.pinkPrimary)
+                
+                Button {
+                    UIPasteboard.general.string = familyCode
+                    // 复制后自动关闭
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "doc.on.doc")
+                        Text("复制家庭码")
+                    }
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [AppColors.pinkStart, AppColors.pinkEnd]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(12)
+                }
+                .padding(.horizontal)
+                .padding(.top, 10)
             }
             .padding()
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        presentationMode.wrappedValue.dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(AppColors.textSecondary)
+                    }
+                }
+            }
         }
     }
 }

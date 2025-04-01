@@ -20,7 +20,7 @@ struct ContentView: View {
                         HomeView(showAddTransaction: $showAddTransaction)
                             .tag(Tab.home)
                         
-                        Text("账单页面")
+                        TransactionsView()
                             .tag(Tab.transactions)
                         
                         Color.clear
@@ -59,6 +59,9 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("LogoutNotification"))) { _ in
             print("收到登出通知，切换到登录界面")
             isLoggedIn = false
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToTransactionsTab"))) { _ in
+            selectedTab = .transactions
         }
     }
 }

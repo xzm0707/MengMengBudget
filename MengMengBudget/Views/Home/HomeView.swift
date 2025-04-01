@@ -126,7 +126,16 @@ struct HomeView: View {
         isLoading = true
         hasError = false
         
+        // 获取当前月份作为默认值
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM"
+        let currentMonth = dateFormatter.string(from: Date())
+        
         NetworkService.shared.getHomeSummary(
+            type: "",        // 空字符串表示不限制类型
+            category: "",    // 空字符串表示不限制类别
+            queryType: 2,    // 0表示查询所有
+            queryMonth: currentMonth,  // 默认使用当前月份
             completion: { income, balance, expense in
                 DispatchQueue.main.async {
                     print("成功获取首页数据并更新UI: income=\(income), balance=\(balance), expense=\(expense)")
@@ -134,12 +143,34 @@ struct HomeView: View {
                     self.monthlyBalance = balance
                     self.monthlyExpense = expense
                     self.isLoading = false
+
+                    // 加载最近交易数据
+                    self.loadRecentTransactions()
                 }
             },
             failure: {
                 DispatchQueue.main.async {
                     self.isLoading = false
                     self.hasError = true
+                }
+            }
+        )
+    }
+
+    private func loadRecentTransactions() {
+        NetworkService.shared.getRecentTransactions(
+            completion: { transactions in
+                DispatchQueue.main.async {
+                    self.recentTransactions = transactions
+                    self.isLoading = false
+                }
+            },
+            failure: {
+                DispatchQueue.main.async {
+                    // 如果只是最近交易加载失败，不显示整体错误
+                    print("加载最近交易失败，使用示例数据")
+                    self.recentTransactions = SampleData.transactions
+                    self.isLoading = false
                 }
             }
         )
@@ -325,11 +356,12 @@ struct RecentTransactionsCard: View {
                 
                 Spacer()
                 
-                Button {
-                    // 查看全部交易
-                } label: {
+                Button(action: {
+                    // 切换到账单页面
+                    NotificationCenter.default.post(name: NSNotification.Name("SwitchToTransactionsTab"), object: nil)
+                }) {
                     Text("查看全部")
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundColor(AppColors.pinkPrimary)
                 }
                 .springyButton()
@@ -370,7 +402,7 @@ struct TransactionRow: View {
     let transaction: Transaction
     
     var body: some View {
-        HStack(spacing: 15) {
+        HStack(spacing: 12) {
             // 分类图标
             let category = SampleData.getCategory(id: transaction.categoryId)
             ZStack {
@@ -386,12 +418,34 @@ struct TransactionRow: View {
             // 交易信息
             VStack(alignment: .leading, spacing: 4) {
                 Text(category.name)
-                    .font(.subheadline)
+                    .font(.system(size: 15, weight: .medium))
                     .foregroundColor(AppColors.textPrimary)
                 
-                Text(transaction.note)
-                    .font(.caption)
-                    .foregroundColor(AppColors.textSecondary)
+                // 下面显示时间、创建者和支付方式
+                HStack(spacing: 4) {
+                    Text(timeFormatter.string(from: transaction.date))
+                        .font(.system(size: 12))
+                        .foregroundColor(AppColors.textSecondary)
+                    
+                    // 创建者信息
+                    if let createdBy = transaction.createdBy, !createdBy.isEmpty {
+                        Text("·")
+                            .font(.system(size: 12))
+                            .foregroundColor(AppColors.textSecondary)
+                        
+                        Text(createdBy)
+                            .font(.system(size: 12))
+                            .foregroundColor(AppColors.pinkPrimary)
+                    }
+                    
+                    Text("·")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppColors.textSecondary)
+                    
+                    Text("支付宝")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppColors.textSecondary)
+                }
             }
             
             Spacer()
@@ -402,6 +456,12 @@ struct TransactionRow: View {
                 .foregroundColor(transaction.isExpense ? .red : (transaction.isIncome ? .green : AppColors.textPrimary))
         }
         .padding(.vertical, 12)
+    }
+    
+    private var timeFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter
     }
 }
 

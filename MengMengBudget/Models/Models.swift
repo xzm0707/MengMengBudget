@@ -22,6 +22,8 @@ struct Transaction: Identifiable {
     var accountId: String
     var date: Date
     var note: String
+    var userId: String? // 添加用户ID
+    var createdBy: String? // 添加创建者
     
     var isExpense: Bool { type == .expense }
     var isIncome: Bool { type == .income }

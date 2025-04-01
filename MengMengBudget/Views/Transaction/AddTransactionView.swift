@@ -9,6 +9,9 @@ struct AddTransactionView: View {
     @State private var selectedAccountId: String = "alipay"
     @State private var date: Date = Date()
     @State private var note: String = ""
+    @State private var isLoading = false
+    @State private var showError = false
+    @State private var errorMessage = "保存失败，请重试"
     
     var body: some View {
         NavigationView {
@@ -80,12 +83,51 @@ struct AddTransactionView: View {
                     .springyButton()
                 }
             }
+            .alert(isPresented: $showError) {
+                Alert(
+                    title: Text("错误"),
+                    message: Text(errorMessage),
+                    dismissButton: .default(Text("确定"))
+                )
+            }
         }
     }
     
     private func saveTransaction() {
-        // 保存交易逻辑
-        presentationMode.wrappedValue.dismiss()
+           // 验证输入
+        guard let amountValue = Double(amount.replacingOccurrences(of: ",", with: ".")) else {
+            errorMessage = "请输入有效金额"
+            showError = true
+            return
+        }
+        
+        isLoading = true
+        
+        // 准备请求数据
+        let transactionData: [String: Any] = [
+            "type": selectedType.rawValue,
+            "amount": amountValue,
+            "category": selectedCategoryId,
+            "description": note
+        ]
+        
+        // 调用API保存交易
+        NetworkService.shared.addTransaction(data: transactionData) { success, message in
+            DispatchQueue.main.async {
+                isLoading = false
+                
+                if success {
+                    // 发送通知，刷新首页数据
+                    NotificationCenter.default.post(name: NSNotification.Name("RefreshHomeData"), object: nil)
+                    
+                    // 关闭视图
+                    presentationMode.wrappedValue.dismiss()
+                } else {
+                    errorMessage = message ?? "保存失败，请重试"
+                    showError = true
+                }
+            }
+        }
     }
 }
 
